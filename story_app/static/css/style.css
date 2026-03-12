@@ -1,17 +1,18 @@
 @import url('https://fonts.googleapis.com/css2?family=Bubblegum+Sans&family=Inter:wght@400;700&display=swap');
 
 :root {
-    --primary-color: #ff6b6b;
-    --secondary-color: #4ecdc4;
-    --accent-color: #ffe66d;
-    --bg-gradient: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
-    --card-bg: rgba(255, 255, 255, 0.8);
+    --primary-color: #ff7675;
+    --secondary-color: #55efc4;
+    --accent-color: #ffeaa7;
+    --bg-gradient: radial-gradient(circle at top, #a8edea 0%, #fed6e3 100%);
+    --card-bg: rgba(255, 255, 255, 0.7);
     --text-color: #2d3436;
 }
 
 body {
     font-family: 'Inter', sans-serif;
     background: var(--bg-gradient);
+    background-attachment: fixed;
     color: var(--text-color);
     margin: 0;
     min-height: 100vh;
@@ -19,99 +20,102 @@ body {
     flex-direction: column;
     align-items: center;
     padding: 2rem;
+    overflow-x: hidden;
 }
 
 h1 {
     font-family: 'Bubblegum Sans', cursive;
-    font-size: 3.5rem;
-    color: var(--primary-color);
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
-    margin-bottom: 1rem;
+    font-size: 4rem;
+    color: #fff;
+    text-shadow: 0 4px 10px rgba(0, 0, 0, 0.1), 0 0 20px rgba(255, 255, 255, 0.5);
+    margin-bottom: 2rem;
     text-align: center;
+    animation: floatingText 3s ease-in-out infinite;
+}
+
+@keyframes floatingText {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
 }
 
 .container {
     background: var(--card-bg);
-    backdrop-filter: blur(10px);
-    border-radius: 24px;
-    padding: 3rem;
-    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
-    max-width: 600px;
+    backdrop-filter: blur(20px);
+    border-radius: 40px;
+    padding: 4rem;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.1);
+    max-width: 650px;
     width: 100%;
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    transition: transform 0.3s ease;
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.container:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 35px 80px rgba(0, 0, 0, 0.15);
 }
 
 .form-group {
-    margin-bottom: 1.5rem;
+    margin-bottom: 2rem;
 }
 
 label {
     display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 600;
+    margin-bottom: 0.8rem;
+    font-weight: 700;
+    color: #444;
+    font-size: 1.1rem;
 }
 
 input[type="file"],
 input[type="text"] {
     width: 100%;
-    padding: 12px;
-    border-radius: 12px;
-    border: 2px solid #eee;
-    font-size: 1rem;
+    padding: 1.2rem;
+    border-radius: 20px;
+    border: 2px solid rgba(0, 0, 0, 0.05);
+    background: rgba(255, 255, 255, 0.8);
+    font-size: 1.1rem;
     box-sizing: border-box;
-    transition: border-color 0.3s ease;
+    transition: all 0.3s ease;
 }
 
 input[type="text"]:focus {
     outline: none;
     border-color: var(--secondary-color);
+    background: #fff;
+    box-shadow: 0 0 15px rgba(85, 239, 196, 0.2);
 }
 
 button {
-    background: var(--primary-color);
+    background: linear-gradient(135deg, var(--primary-color) 0%, #ff5252 100%);
     color: white;
     border: none;
-    padding: 14px 28px;
-    border-radius: 12px;
-    font-size: 1.2rem;
+    padding: 1.2rem 2.5rem;
+    border-radius: 25px;
+    font-size: 1.4rem;
     font-weight: 700;
     cursor: pointer;
     width: 100%;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+    transition: all 0.4s ease;
+    box-shadow: 0 10px 30px rgba(255, 118, 117, 0.4);
+    letter-spacing: 1px;
 }
 
 button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
-    background: #ff5252;
+    transform: translateY(-5px) scale(1.02);
+    box-shadow: 0 15px 45px rgba(255, 118, 117, 0.6);
 }
 
-button:active {
-    transform: translateY(0);
-}
-
-.error-msg {
-    background: #ffeaa7;
-    color: #d63031;
-    padding: 1rem;
-    border-radius: 12px;
-    margin-bottom: 1.5rem;
-    font-weight: 600;
-    border-left: 5px solid #d63031;
-}
-
-/* Loading Spinner */
+/* Enhanced Spinner */
 .spinner {
     display: none;
-    width: 40px;
-    height: 40px;
-    margin: 20px auto;
-    border: 4px solid rgba(0, 0, 0, .1);
+    width: 60px;
+    height: 60px;
+    margin: 30px auto;
+    border: 6px solid rgba(0, 0, 0, .05);
     border-radius: 50%;
     border-top-color: var(--secondary-color);
-    animation: spin 1s ease-in-out infinite;
+    animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
@@ -260,3 +264,64 @@ button:active {
     font-weight: 700;
     margin-bottom: 1rem;
 }
+
+/* Image Loading Placeholder */
+.image-loading-placeholder {
+    padding: 3rem;
+    text-align: center;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    border-radius: 10px;
+    margin-bottom: 1rem;
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Audio Button Styling */
+.audio-btn {
+    background: var(--secondary-color) !important;
+    color: white !important;
+    border: none !important;
+    padding: 6px 14px !important;
+    border-radius: 20px !important;
+    font-size: 0.85rem !important;
+    cursor: pointer !important;
+    width: auto !important;
+    display: inline-block !important;
+    box-shadow: 0 2px 8px rgba(78, 205, 196, 0.3) !important;
+    margin-left: 8px;
+    vertical-align: middle;
+    transition: all 0.3s ease !important;
+}
+
+.audio-btn:hover {
+    background: #3dbdb5 !important;
+    transform: scale(1.05) !important;
+}
+
+/* Back Button */
+.back-btn {
+    display: inline-block;
+    padding: 12px 28px;
+    background: var(--secondary-color);
+    color: white;
+    text-decoration: none;
+    border-radius: 50px;
+    font-weight: 700;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(78, 205, 196, 0.3);
+}
+
+.back-btn:hover {
+    background: #3dbdb5;
+    transform: translateY(-2px);
+}
+
+/* Story Text Styling */
+.story-text {
+    padding: 1rem;
+    font-size: 1.1rem;
+    line-height: 1.7;
+}

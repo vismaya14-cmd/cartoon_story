@@ -11,9 +11,9 @@
 
 <body>
 
-    <h1>Magical Story Generator</h1>
+    <h1 title="High-Quality AI Animation Engine">🎬 Pixar Movie Maker 🎬</h1>
 
-    <div class="container">
+    <div class="container fade-in">
         {% if error %}
         <div class="error-msg">{{ error }}</div>
         {% endif %}
@@ -22,19 +22,19 @@
             {% csrf_token %}
 
             <div class="form-group">
-                <label for="image">Upload Your Photo</label>
+                <label for="image">📸 Upload a Photo to Animate</label>
                 <input type="file" id="image" name="image" accept="image/*" required>
             </div>
 
             <div class="form-group">
-                <label for="hero">Hero Name</label>
-                <input type="text" id="hero" name="hero" placeholder="e.g. Brave Alex" required>
+                <label for="hero">🧙‍♂️ Hero's Name</label>
+                <input type="text" id="hero" name="hero" placeholder="e.g. Luna the Brave" required>
             </div>
 
             <div class="form-group">
-                <label for="language">Story Language</label>
+                <label for="language">🌍 Narration Language</label>
                 <select id="language" name="language" required
-                    style="width: 100%; padding: 0.8rem; border: 2px solid #a8edea; border-radius: 10px; font-family: 'Inter', sans-serif; font-size: 1rem;">
+                    style="width: 100%; padding: 1.1rem; border: 2px solid rgba(0,0,0,0.05); border-radius: 20px; font-family: 'Inter', sans-serif; font-size: 1.1rem; background: rgba(255,255,255,0.8);">
                     <option value="English">English</option>
                     <option value="Kannada">Kannada</option>
                     <option value="Hindi">Hindi</option>
@@ -42,15 +42,14 @@
                 </select>
             </div>
 
-            <button type="submit" id="submitBtn">Generate My Magic Story!</button>
+            <button type="submit" id="submitBtn">Generate Animated Movie! 🎞️</button>
             <div id="loader" class="spinner"></div>
-            <p id="waitMsg"
-                style="display: none; text-align: center; font-size: 0.9rem; color: #666; margin-top: 10px;">
-                Magical things take time... Please stay on this page while we talk to the AI. <br>
-                (It might take up to 2 minutes if the stars are busy! ✨)
-            </p>
-
-
+            <div id="waitMsg" style="display: none; text-align: center; margin-top: 2rem; font-size: 1.1rem; line-height: 1.6; color: #666; font-weight: 500;">
+                <span style="font-size: 1.5rem;">📽️</span><br>
+                <b>Directing your Pixar Masterpiece...</b><br>
+                We are generating 5 unique animated scenes with cinematic lighting.<br>
+                <small>(Estimated wait: 2-3 minutes. Magic takes time!)</small>
+            </div>
         </form>
     </div>
 

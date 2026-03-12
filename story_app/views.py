@@ -15,8 +15,11 @@ from azure.ai.inference.models import (
     TextContentItem,
 )
 from azure.core.credentials import AzureKeyCredential
+from .cartoon_filter import cartoonize
+import requests
+from concurrent.futures import ThreadPoolExecutor
 
-# Load environment variables (override allows updating if file changes)
+# Load environment variables
 load_dotenv(override=True)
 
 # Configure GitHub Models API
@@ -32,6 +35,80 @@ client = ChatCompletionsClient(
     credential=AzureKeyCredential(GITHUB_TOKEN),
 )
 
+# Configure Hugging Face API
+HF_API_KEY = os.getenv("HF_API_KEY")
+HF_MODEL = "stabilityai/stable-diffusion-xl-base-1.0"
+HF_API_URL = f"https://router.huggingface.co/hf-inference/models/{HF_MODEL}"
+
+def pollinations_generate(prompt, output_path, seed=None):
+    """
+    Generate an image using Pollinations.ai (Free, high-speed fallback).
+    """
+    try:
+        if seed is None:
+            seed = int(time.time())
+            
+        # Pollinations is VERY sensitive to length and special chars.
+        # We simplify to the core 120 chars to ensure it doesn't time out.
+        simple_prompt = prompt[:120]
+        encoded_prompt = urllib.parse.quote(simple_prompt)
+        
+        # Simplest possible URL works best
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?seed={seed}&nologo=true"
+        print(f"DEBUG: Calling Pollinations (Simple) for: {simple_prompt[:40]}...")
+        
+        response = requests.get(url, timeout=35)
+        
+        # Check if it's an image
+        content_type = response.headers.get("Content-Type", "").lower()
+        if response.status_code == 200 and "image" in content_type:
+            with open(output_path, "wb") as f:
+                f.write(response.content)
+            return True
+        else:
+            print(f"DEBUG: Pollinations Failure ({response.status_code}) - Type: {content_type}")
+    except Exception as e:
+        print(f"DEBUG: Pollinations Exception: {str(e)}")
+    return False
+
+
+def huggingface_generate(prompt, output_path, retries=1):
+    """
+    Generate an image using Hugging Face SDXL.
+    """
+    if not HF_API_KEY:
+        return False
+    
+    headers = {"Authorization": f"Bearer {HF_API_KEY}"}
+    payload = {
+        "inputs": prompt,
+        "parameters": {
+            "negative_prompt": "photorealistic, photo, real life, gritty, messy, blurry, lowres, text, watermark",
+            "guidance_scale": 9.0,
+            "num_inference_steps": 30
+        }
+    }
+
+    for attempt in range(retries + 1):
+        try:
+            print(f"DEBUG: Calling Hugging Face for prompt: {prompt[:50]}... (Attempt {attempt + 1})")
+            response = requests.post(HF_API_URL, headers=headers, json=payload, timeout=90)
+            
+            if response.status_code == 200:
+                with open(output_path, "wb") as f:
+                    f.write(response.content)
+                return True
+            else:
+                print(f"DEBUG: HF Error {response.status_code}: {response.text[:100]}")
+                # Don't retry on auth errors or 404
+                if response.status_code in [401, 403, 404]:
+                    break
+                time.sleep(2)
+        except Exception as e:
+            print(f"DEBUG: HF Exception: {str(e)}")
+            time.sleep(1)
+    return False
+
 
 def home(request):
 
@@ -44,15 +121,15 @@ def home(request):
         if not image_file:
             return render(request, "index.html", {"error": "Please upload an image."})
 
-        # create folders automatically
+        # Create folders
         images_folder = os.path.join(settings.MEDIA_ROOT, "images")
-        audio_folder = os.path.join(settings.MEDIA_ROOT, "audio")
-
+        cartoon_folder = os.path.join(settings.MEDIA_ROOT, "cartoon")
         os.makedirs(images_folder, exist_ok=True)
-        os.makedirs(audio_folder, exist_ok=True)
+        os.makedirs(cartoon_folder, exist_ok=True)
 
-        # save uploaded image
-        image_name = f"{int(time.time())}_{image_file.name}"
+        # Save uploaded image
+        timestamp = int(time.time())
+        image_name = f"{timestamp}_{image_file.name}"
         image_path = os.path.join(images_folder, image_name)
 
         with open(image_path, "wb+") as f:
@@ -61,127 +138,154 @@ def home(request):
 
         original_image_url = settings.MEDIA_URL + "images/" + image_name
 
-        # Read image bytes and encode to base64 for the API
+        # Read image for AI description
         image_file.seek(0)
         image_bytes = image_file.read()
         base64_image = base64.b64encode(image_bytes).decode("utf-8")
-
-        # Determine MIME type
         content_type = image_file.content_type or "image/jpeg"
-
-        # Build the data URI for the image
         data_uri = f"data:{content_type};base64,{base64_image}"
 
+        # 1. Ask GPT-4o to describe the character and write the story
+        # This ensures character consistency across prompts
         prompt = f"""
-        You are a creative children's comic book author and a visual artist.
-        The user has uploaded a photo of a person. The character's name is {hero_name}.
-        
-        Task 1: Describe the person in the photo physically in English (age, hair style/color, eye color, clothing style/colors, defining features). Be very specific so the character looks consistent in all panels.
-        
-        Task 2: Write a magical, child-friendly 7-panel comic book story starring {hero_name}. 
-        The story MUST be written in {language}. 
-        It should be fun, magical, and have a clear beginning, middle, and satisfying conclusion. 
-        DO NOT use markdown formatting like ** in the story text.
-        
-        Task 3: For each of the 7 panels, write a highly detailed English image generation prompt. 
-        The prompt must start with: "Pixar 3d style cartoon illustration of a..." 
-        and include the EXACT physical description from Task 1, plus what is happening in the scene, the background, and the magical environment.
-        
-        You MUST return the output ONLY as a raw JSON string with the following structure:
+        You are a Master Director at Pixar Animation Studios. 
+        Analyze the uploaded photo of {hero_name} and create a professional children's animated movie.
+
+        Task 1: Signature Pixar Character. 
+        Describe {hero_name} as a 3D animated character with a STRIKING and CONSISTENT visual signature.
+        Details to include: Unique hairstyle/color, eye color, a specific signature outfit (e.g., "wearing a glowing blue tunic and silver boots"), and expressive facial style.
+        This "Character Signature" MUST be the centerpiece of every scene prompt.
+
+        Task 2: Cinematic 5-Scene Script. 
+        Write a heartwarming 5-scene story in {language} about {hero_name}. 
+        MANDATORY PROGRESSION: 
+        1. Intro: {hero_name} in a vibrant, detailed village.
+        2. Adventure: Exploring a magical forest with floating lights.
+        3. Mystery: Discovering a hidden ancient secret.
+        4. Climax: Solving a challenge with a clever idea.
+        5. Celebration: A grand happy ending in a festival setting.
+
+        Task 3: Pixar-Style Image Prompts. 
+        Write a unique, highly-detailed image prompt for EACH scene.
+        FORMAT: "Pixar style 3D animation, [CHARACTER SIGNATURE], [SPECIFIC SCENE ACTION], [VIBRANT CINEMATIC BACKGROUND], colorful lighting, masterpiece, 8k render, children's animated movie style"
+        CRITICAL: Each background MUST be different and highly detailed.
+
+        Return ONLY valid JSON:
         {{
-            "hero_description": "English description of the hero",
-            "cover_image_prompt": "Pixar 3d style cartoon portrait of a... [detailed hero description from Task 1] standing in a magical sparkling environment, vibrant colors, heroic pose, cinematic lighting",
+            "character_signature": "detailed 50-word visual description",
+            "story_title": "Grand Title",
             "panels": [
                 {{
-                    "narrative_text": "Story text for panel 1 in {language}",
-                    "image_prompt": "Pixar 3d style cartoon illustration of a... [detailed hero description] [action] [magical background]"
-                }},
-                ... (7 panels total)
+                    "text": "story narrative for this page",
+                    "prompt": "the full cinematic image prompt"
+                }}
             ]
         }}
-        Do not include ```json markdown blocks, just the raw JSON object.
         """
 
         try:
-            print(f"DEBUG: Generating {language} story for {hero_name} using GitHub Models API ({MODEL})...")
-
+            print("DEBUG: Generating premium 3D AI story...")
             response = client.complete(
                 messages=[
-                    SystemMessage("You are a creative children's story writer. Always respond with valid JSON only."),
-                    UserMessage(
-                        content=[
-                            TextContentItem(text=prompt),
-                            ImageContentItem(image_url=ImageUrl(url=data_uri)),
-                        ]
-                    ),
+                    SystemMessage("You are a Disney-Pixar Storyboard Artist. You create concise, high-impact 3D animation prompts and whimsical stories. Keep prompts under 200 chars. Output valid JSON only."),
+                    UserMessage(content=[
+                        TextContentItem(text=prompt),
+                        ImageContentItem(image_url=ImageUrl(url=data_uri))
+                    ])
                 ],
-                model=MODEL,
+                model=MODEL
             )
 
-            print(f"DEBUG: GitHub Models API responded successfully.")
+            result_text = response.choices[0].message.content.strip()
+            if result_text.startswith("```"): result_text = result_text.strip("`").strip("json")
+            
+            story_data = json.loads(result_text)
+            char_sig = story_data.get("character_signature", "a friendly child with expressive eyes")
+            story_title = story_data.get("story_title", f"{hero_name}'s Adventure")
+            panels = story_data.get("panels", [])
 
-            result_text = response.choices[0].message.content
-            if result_text:
-                # Clean up markdown if the AI includes it by accident
-                json_text = result_text.strip()
-                if json_text.startswith("```json"):
-                    json_text = json_text[7:]
-                if json_text.startswith("```"):
-                    json_text = json_text[3:]
-                if json_text.endswith("```"):
-                    json_text = json_text[:-3]
-
-                story_data = json.loads(json_text.strip())
-                hero_desc = story_data.get("hero_description", "")
-                panels = story_data.get("panels", [])
-
-                # Generate a cartoon cover image from the hero description
-                cover_prompt = story_data.get("cover_image_prompt", "")
-                if not cover_prompt:
-                    cover_prompt = f"Pixar 3d style cartoon portrait of a {hero_desc}, standing in a magical sparkling environment, vibrant colors, heroic pose, cinematic lighting"
-
-                encoded_cover = urllib.parse.quote(cover_prompt)
-                cover_image_url = f"https://image.pollinations.ai/prompt/{encoded_cover}?width=1024&height=1024&nologo=true&seed={int(time.time())}"
-
-                pages = []
-
-                for panel in panels:
-                    img_prompt = panel.get("image_prompt", "")
-                    story = panel.get("narrative_text", "")
-
-                    # Proper URL encoding for image prompts
-                    encoded_prompt = urllib.parse.quote(img_prompt)
-                    image_gen_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed={int(time.time())}"
-
-                    pages.append({
-                        "narrative_text": story,
-                        "image_url": image_gen_url
-                    })
+            # Generate Hero Image (Hugging Face -> Pollinations Fallback)
+            # Use user's EXACT required keywords for maximum Pixar quality
+            hero_prompt = f"Pixar style 3D animation, {char_sig}, standing in a vibrant, detailed village, colorful cinematic lighting, expressive cartoon character, detailed animated movie style, masterpiece, 8k render."
+            
+            cartoon_name = f"cartoon_{timestamp}.jpg"
+            cartoon_path = os.path.join(cartoon_folder, cartoon_name)
+            print(f"DEBUG: Generating Pixar-style 3D hero for {hero_name}...")
+            
+            # Try HF first, then Pollinations
+            hf_success = huggingface_generate(hero_prompt, cartoon_path)
+            if not hf_success:
+                print("DEBUG: HF Hero failed. Trying Pollinations fallback...")
+                hf_success = pollinations_generate(hero_prompt, cartoon_path, seed=timestamp)
+            
+            # FINAL FALLBACK: If AI completely fails, use OpenCV cartoonize
+            if not hf_success:
+                print("DEBUG: AI Hero failed. Falling back to OpenCV CARTOONIZE...")
+                cartoon_success = cartoonize(image_path, cartoon_path)
+                cartoon_image_url = (settings.MEDIA_URL + "cartoon/" + cartoon_name) if cartoon_success else original_image_url
             else:
-                raise Exception("AI returned empty response")
+                cartoon_image_url = settings.MEDIA_URL + "cartoon/" + cartoon_name
 
-            if not pages:
-                raise Exception("AI failed to generate story panels.")
+            # Generate all Scene Images (Parallel for speed)
+            pages = []
+            
+            def generate_scene_image(idx, panel_prompt):
+                scene_name = f"scene_{timestamp}_{idx}.jpg"
+                scene_path = os.path.join(cartoon_folder, scene_name)
+                
+                # 1. Try Primary High-Quality Generation (HF SDXL)
+                success = huggingface_generate(panel_prompt, scene_path)
+                
+                # 2. Try Pollinations with the full prompt
+                if not success:
+                    print(f"DEBUG: Scene {idx} HF failed. Trying Pollinations Full Prompt...")
+                    success = pollinations_generate(panel_prompt, scene_path, seed=timestamp + idx)
+                
+                # 3. New Hybrid Fallback: If full prompt fails, try a SIMPLE BACKGROUND ONLY prompt
+                # This ensures the user at least gets a beautiful Pixar background.
+                if not success:
+                    # Extract last 40 chars of prompt (usually where background is described)
+                    bg_keyword = panel_prompt.split(",")[-2].strip() if "," in panel_prompt else "magical 3d world"
+                    bg_prompt = f"Pixar style 3D animation background, {bg_keyword}, colorful cinematic lighting, masterpiece, high-quality 3D render"
+                    print(f"DEBUG: Scene {idx} full prompt failed. Trying simplified Background-Only: {bg_keyword}")
+                    success = pollinations_generate(bg_prompt, scene_path, seed=timestamp + idx)
 
-        except json.JSONDecodeError as e:
-            print(f"DEBUG: JSON Parse Error: {str(e)}")
-            return render(request, "index.html", {
-                 "error": "AI generated an invalid story format. Please try again."
+                # 4. FINAL LOCAL FALLBACK: If AI completely fails, use Sharp 3D Synth 3.0
+                if success:
+                    return settings.MEDIA_URL + "cartoon/" + scene_name
+                else:
+                    print(f"DEBUG: Scene {idx} AI completely failed. Using Sharp 3D Synth Variation {idx}")
+                    # Variation shifts camera framing and color mood
+                    cartoon_success = cartoonize(image_path, scene_path, variation=idx)
+                    if cartoon_success:
+                        return settings.MEDIA_URL + "cartoon/" + scene_name
+                    return cartoon_image_url
+
+            print(f"DEBUG: Generating {len(panels)} Pixar scenes in parallel...")
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                # Kick off all generations
+                futures = [executor.submit(generate_scene_image, i, p["prompt"]) for i, p in enumerate(panels)]
+                # Wait and collect results
+                scene_urls = [f.result() for f in futures]
+
+            for i, panel in enumerate(panels):
+                pages.append({
+                    "narrative_text": panel["text"],
+                    "scene_image_url": scene_urls[i],
+                    "panel_number": i + 1
+                })
+
+            return render(request, "storybook.html", {
+                "hero": hero_name,
+                "language": language,
+                "hero_description": char_sig,
+                "story_title": story_title,
+                "cartoon_image_url": cartoon_image_url,
+                "pages": pages,
             })
+
         except Exception as e:
-            print(f"DEBUG: General Error: {str(e)}")
-            return render(request, "index.html", {
-                "error": f"AI Generation error: {str(e)}"
-            })
-
-        print("DEBUG: Rendering final storybook page!")
-        return render(request, "storybook.html", {
-            "hero": hero_name,
-            "language": language,
-            "hero_description": hero_desc,
-            "original_image_url": original_image_url,
-            "cover_image_url": cover_image_url,
-            "pages": pages
-        })
+            print(f"DEBUG: Critical Error: {str(e)}")
+            return render(request, "index.html", {"error": f"Failed to generate story: {str(e)}"})
 
     return render(request, "index.html")

@@ -4,161 +4,500 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Your Magical Story - {{ hero }}</title>
+    <title>{{ story_title }}</title>
     {% load static %}
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link href="https://fonts.googleapis.com/css2?family=Bubblegum+Sans&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a0a1a;
+            color: #fff;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* ===== LANDING: Immersive Magic Engine ===== */
+        #landingPage {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            background: radial-gradient(circle at center, #2c3e50 0%, #000 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2rem;
+            padding: 2rem;
+            transition: opacity 1.2s ease;
+        }
+
+        #landingPage.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .hero-banner {
+            position: relative;
+            width: 250px;
+            height: 250px;
+            border-radius: 50%;
+            border: 4px solid #ffd700;
+            box-shadow: 0 0 50px rgba(255, 215, 0, 0.4);
+            overflow: hidden;
+            animation: pulse 3s infinite ease-in-out;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 50px rgba(255, 215, 0, 0.4); }
+            50% { transform: scale(1.05); box-shadow: 0 0 80px rgba(255, 215, 0, 0.6); }
+        }
+
+        .hero-banner img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* ===== MAGICAL FX LAYERS ===== */
+        .sparkle-overlay {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 3;
+            background-image: radial-gradient(circle, #fff 1px, transparent 1px);
+            background-size: 50px 50px;
+            opacity: 0.3;
+            animation: moveSparkles 20s linear infinite;
+        }
+
+        @keyframes moveSparkles {
+            from { background-position: 0 0; }
+            to { background-position: 500px 1000px; }
+        }
+
+        .cloud {
+            position: absolute;
+            width: 300px;
+            height: 100px;
+            background: rgba(255, 255, 255, 0.1);
+            filter: blur(40px);
+            border-radius: 50%;
+            z-index: 2;
+            animation: drift 60s linear infinite;
+            pointer-events: none;
+        }
+
+        @keyframes drift {
+            from { left: -400px; }
+            to { left: 120%; }
+        }
+
+        /* Ken Burns Effect */
+        @keyframes kenBurns {
+            0% { transform: scale(1) translate(0, 0); }
+            50% { transform: scale(1.15) translate(-2%, -2%); }
+            100% { transform: scale(1) translate(0, 0); }
+        }
+
+        .scene-image-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+        }
+
+        .scene-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            animation: kenBurns 20s infinite ease-in-out;
+        }
+
+        .scene-image.fade-out {
+            opacity: 0;
+            transform: scale(0.95);
+        }
+
+        /* Story text area - Floating Bottom Overlay */
+        .story-text-area {
+            position: absolute;
+            bottom: 6rem;
+            width: 90%;
+            max-width: 800px;
+            padding: 1.5rem 2.5rem;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.4);
+            z-index: 10;
+            transform: translateY(0);
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.6s;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .story-text-area.slide-up {
+            transform: translateY(30px);
+            opacity: 0;
+        }
+
+        .story-text-content {
+            font-size: 1.25rem;
+            line-height: 1.5;
+            color: #1a1a2e;
+            font-family: 'Inter', sans-serif;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        .typewriter-cursor {
+            display: inline-block;
+            width: 2px;
+            height: 1.2em;
+            background: #e74c3c;
+            margin-left: 2px;
+            animation: blink 0.7s infinite;
+            vertical-align: text-bottom;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        /* ===== CONTROLS BAR ===== */
+        .controls-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.8rem;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(10px);
+            z-index: 2;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .ctrl-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.08);
+            color: white;
+            font-size: 1.3rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .ctrl-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.4);
+            transform: scale(1.1);
+        }
+
+        .ctrl-btn.main-btn {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            border: none;
+            font-size: 1.5rem;
+            box-shadow: 0 4px 20px rgba(231, 76, 60, 0.4);
+        }
+
+        .ctrl-btn.main-btn:hover {
+            box-shadow: 0 6px 25px rgba(231, 76, 60, 0.5);
+        }
+
+        /* Progress bar */
+        .progress-container {
+            flex: 1;
+            max-width: 300px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ffd700, #e74c3c);
+            border-radius: 2px;
+            transition: width 0.5s ease;
+        }
+
+        /* Exit button */
+        .exit-btn {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            z-index: 10;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            font-size: 1.2rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .exit-btn:hover {
+            background: rgba(231, 76, 60, 0.7);
+        }
+
+        /* Mobile */
+        @media (max-width: 600px) {
+            .landing-title { font-size: 1.8rem; }
+            .landing-img-box img { width: 130px; height: 130px; }
+            .play-story-btn { font-size: 1.1rem; padding: 14px 36px; }
+            .scene-image-wrapper { max-height: 35vh; }
+            .scene-image { max-height: 35vh; }
+            .story-text-content { font-size: 1rem; }
+            .ctrl-btn { width: 40px; height: 40px; font-size: 1.1rem; }
+            .ctrl-btn.main-btn { width: 48px; height: 48px; font-size: 1.3rem; }
+        }
+    </style>
 </head>
 
 <body>
 
-    <h1>The Adventures of {{ hero }}</h1>
-
-    <!-- View Toggle -->
-    <div class="view-toggle">
-        <button id="bookBtn" class="toggle-btn active" onclick="setView('book')">📖 Play Storybook</button>
-        <button id="fullBtn" class="toggle-btn" onclick="setView('full')">📜 See Full Story</button>
+    <!-- ===== LANDING PAGE ===== -->
+    <div id="landingPage">
+        <h1 class="landing-title">📽️ Animation Studio Presents</h1>
+        <div class="hero-banner">
+            <img src="{{ cartoon_image_url }}" alt="Your Pixar Character">
+        </div>
+        <div class="landing-title" style="font-size: 3rem;">{{ story_title }}</div>
+        <p class="landing-desc" style="font-size: 1.2rem; color: white;">{{ hero_description|truncatewords:20 }}...</p>
+        <button class="play-story-btn" onclick="startStory()">▶ Start Animated Movie</button>
     </div>
 
-    <div class="container book-container" id="storyContainer">
+    <!-- ===== CINEMATIC STORY PLAYER ===== -->
+    <div id="storyPlayer">
+        <div class="scene-bg" id="sceneBg"></div>
+        <div class="sparkle-overlay"></div>
+        <div class="cloud" style="top: 10%; animation-delay: 0s;"></div>
+        <div class="cloud" style="top: 50%; animation-delay: -30s;"></div>
 
-        <!-- Comic Book Mode -->
-        <div id="bookMode">
-            <!-- Cover Page -->
-            <div class="comic-page active" id="page-0">
-                <div style="text-align: center;">
-                    <img src="{{ cover_image_url }}" alt="Cartoon Hero" class="moving-hero" style="max-width:100%; border-radius:15px; border: 10px solid white; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
-                    <div class="scene-number">✨ The Beginning ✨</div>
-                </div>
-                <div class="story-text" style="text-align: center; font-size: 1.5rem; color: var(--primary-color);">
-                    <p>Once upon a time, there was a hero named <strong>{{ hero }}</strong>...</p>
-                    <p style="font-size: 1rem; color: #666; font-style: italic;">{{ hero_description }}</p>
-                    <div style="margin-top: 10px;">
-                        <img src="{{ original_image_url }}" alt="Original Photo" style="width: 80px; height: 80px; border-radius: 50%; border: 3px solid #a8edea; object-fit: cover;">
-                        <p style="font-size: 0.75rem; color: #999;">Original Photo</p>
-                    </div>
-                </div>
+        <button class="exit-btn" onclick="exitPlayer()" title="Back">✕</button>
+
+        <div class="player-content">
+            <div class="scene-counter" id="sceneCounter">Page 1 of {{ pages|length }}</div>
+
+            <div class="scene-image-wrapper">
+                <img class="scene-image" id="sceneImage" src="{{ pages.0.scene_image_url }}" alt="Scene">
             </div>
 
-            {% for page in pages %}
-            <div class="comic-page" id="page-{{ forloop.index }}">
-                <div style="text-align: center;">
-                    <img src="{{ page.image_url }}" alt="Scene {{ forloop.index }}" class="moving-hero" style="max-width:100%; border-radius:10px;">
-                    <div class="scene-number">Scene {{ forloop.index }} <button
-                            onclick="playAudio('{{ page.narrative_text|escapejs }}', '{{ language }}')"
-                            class="audio-btn">🔊 Play</button></div>
-                </div>
-                <div class="story-text">
-                    {{ page.narrative_text|linebreaks }}
-                </div>
-            </div>
-            {% endfor %}
-
-            <!-- Pager Navigation -->
-            <div class="pager-nav">
-                <button id="prevBtn" class="nav-btn" onclick="changePage(-1)" disabled>← Back</button>
-                <span id="pageIndicator" style="font-weight: 700;">Page 1 of {{ pages|length|add:1 }}</span>
-                <button id="nextBtn" class="nav-btn" onclick="changePage(1)">Next Page →</button>
+            <div class="story-text-area">
+                <div class="story-text-content" id="storyText"></div>
             </div>
         </div>
 
-        <!-- Full Story Mode (Hidden by default) -->
-        <div id="fullMode" class="full-story-view">
-            <div class="scene-block" style="text-align: center;">
-                 <img src="{{ original_image_url }}" alt="Original Hero" style="max-width:300px; border-radius:15px; border: 5px solid white;">
-                 <h3>The Hero: {{ hero }}</h3>
-            </div>
-            {% for page in pages %}
-            <div class="scene-block">
-                <div class="scene-number">Scene {{ forloop.index }} <button
-                        onclick="playAudio('{{ page.narrative_text|escapejs }}', '{{ language }}')"
-                        class="audio-btn">🔊</button></div>
-                <div style="text-align: center; margin-bottom: 20px;">
-                    <img src="{{ page.image_url }}" alt="Scene {{ forloop.index }}" style="max-width:100%; border-radius:10px;">
-                </div>
-                <div class="story-text">
-                    {{ page.narrative_text|linebreaks }}
-                </div>
-            </div>
-            {% endfor %}
-        </div>
+        <!-- Controls -->
+        <div class="controls-bar">
+            <button class="ctrl-btn" onclick="prevScene()" title="Back" id="prevBtn" style="width: 120px; border-radius: 30px; font-size: 1rem;">
+                ← Back
+            </button>
+            <button class="ctrl-btn main-btn" onclick="togglePlayPause()" title="Play/Pause Voice" id="playPauseBtn">🔊</button>
+            <button class="ctrl-btn" onclick="nextScene()" title="Next" id="nextBtn" style="width: 120px; border-radius: 30px; font-size: 1rem; background: #e74c3c; border: none; font-weight: bold;">
+                Next →
+            </button>
 
-        <div style="text-align: center; margin-top: 3rem;">
-            <a href="/" class="back-btn">← Create Another Magical Story</a>
+            <div class="progress-container" style="max-width: 150px;">
+                <div class="progress-fill" id="progressBar" style="width: 0%"></div>
+            </div>
         </div>
     </div>
 
     <script>
-        let currentPage = 0;
-        const totalPages = {{ pages|length|add:1 }};
+        // ===== STORY DATA =====
+        const scenes = [
+            {% for page in pages %}
+            {
+                text: `{{ page.narrative_text|escapejs }}`,
+                sceneImage: "{{ page.scene_image_url }}",
+                number: {{ forloop.counter }}
+            }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ];
 
-        function setView(mode) {
-            const bookMode = document.getElementById('bookMode');
-            const fullMode = document.getElementById('fullMode');
-            const bookBtn = document.getElementById('bookBtn');
-            const fullBtn = document.getElementById('fullBtn');
+        const cartoonImage = "{{ cartoon_image_url }}";
+        const totalScenes = scenes.length;
+        const language = "{{ language }}";
 
-            if (mode === 'book') {
-                bookMode.style.display = 'block';
-                fullMode.classList.remove('active');
-                bookBtn.classList.add('active');
-                fullBtn.classList.remove('active');
-            } else {
-                bookMode.style.display = 'none';
-                fullMode.classList.add('active');
-                bookBtn.classList.remove('active');
-                fullBtn.classList.add('active');
-            }
+        let currentScene = 0;
+        let isVoicePlaying = true;
+        let typewriterTimer = null;
+        let autoAdvanceTimer = null;
+
+        // ===== START STORY =====
+        function startStory() {
+            document.getElementById('landingPage').classList.add('hidden');
+            document.getElementById('storyPlayer').classList.add('active');
+            currentScene = 0;
+            showScene(0);
         }
 
-        function changePage(delta) {
-
-            const newPage = currentPage + delta;
-
-            if (newPage >= 0 && newPage < totalPages) {
-
-                document.getElementById("page-" + currentPage).classList.remove("active");
-
-                currentPage = newPage;
-
-                const pageEl = document.getElementById("page-" + currentPage);
-                pageEl.classList.add("active");
-
-                // Trigger fresh animation if image exists
-                const img = pageEl.querySelector('img');
-                if (img) {
-                    img.style.animation = 'none';
-                    img.offsetHeight; // trigger reflow
-                    img.style.animation = null;
-                }
-
-                // Stop playing audio when turning page
-                window.speechSynthesis.cancel();
-                updatePager();
-            }
+        function exitPlayer() {
+            speechSynthesis.cancel();
+            clearTimeout(typewriterTimer);
+            clearTimeout(autoAdvanceTimer);
+            document.getElementById('storyPlayer').classList.remove('active');
+            document.getElementById('landingPage').classList.remove('hidden');
         }
 
-        function updatePager() {
-            document.getElementById('prevBtn').disabled = (currentPage === 0);
-            document.getElementById('nextBtn').disabled = (currentPage === totalPages - 1);
-            document.getElementById("pageIndicator").innerText = "Page " + (currentPage + 1) + " of " + totalPages;
-        }
+        // ===== SHOW SCENE =====
+        // ===== SHOW SCENE =====
+        function showScene(index) {
+            if (index < 0 || index >= totalScenes) return;
+            currentScene = index;
 
-        function playAudio(text, langName) {
-
+            clearTimeout(typewriterTimer);
+            clearTimeout(autoAdvanceTimer);
             speechSynthesis.cancel();
 
-            const speech = new SpeechSynthesisUtterance();
+            const scene = scenes[currentScene];
+            const img = document.getElementById('sceneImage');
+            const bg = document.getElementById('sceneBg');
+            const textArea = document.querySelector('.story-text-area');
 
+            // Update counter
+            document.getElementById('sceneCounter').textContent = `Scene ${currentScene + 1} of ${totalScenes}`;
+
+            // Update progress
+            document.getElementById('progressBar').style.width = `${((currentScene + 1) / totalScenes) * 100}%`;
+
+            // Transition animations
+            img.classList.add('fade-out');
+            textArea.classList.add('slide-up');
+
+            setTimeout(() => {
+                img.src = scene.sceneImage;
+                bg.style.backgroundImage = `url('${scene.sceneImage}')`;
+                
+                img.onload = () => {
+                    img.classList.remove('fade-out');
+                    textArea.classList.remove('slide-up');
+                    
+                    // Start typewriter + narration
+                    typewriterEffect(scene.text, () => {
+                        if (isVoicePlaying) {
+                            narrate(scene.text, () => {
+                                if (currentScene < totalScenes - 1) {
+                                    autoAdvanceTimer = setTimeout(nextScene, 3000);
+                                }
+                            });
+                        }
+                    });
+                };
+            }, 500);
+
+            // Update button states
+            document.getElementById('prevBtn').style.visibility = currentScene === 0 ? 'hidden' : 'visible';
+            const nextBtn = document.getElementById('nextBtn');
+            if (currentScene === totalScenes - 1) {
+                nextBtn.textContent = 'Finish';
+                nextBtn.onclick = exitPlayer;
+            } else {
+                nextBtn.textContent = 'Next →';
+                nextBtn.onclick = nextScene;
+            }
+        }
+
+        // ===== TYPEWRITER EFFECT =====
+        function typewriterEffect(text, onComplete) {
+            const el = document.getElementById('storyText');
+            el.innerHTML = '';
+            let i = 0;
+            const speed = 25; 
+
+            function type() {
+                if (i < text.length) {
+                    el.innerHTML = text.substring(0, i + 1) + '<span class="typewriter-cursor"></span>';
+                    i++;
+                    typewriterTimer = setTimeout(type, speed);
+                } else {
+                    el.innerHTML = text;
+                    if (onComplete) onComplete();
+                }
+            }
+            type();
+        }
+
+        // ===== NARRATION =====
+        function narrate(text, onEnd) {
+            speechSynthesis.cancel();
+            
+            // Wait for voices to load if they haven't yet
+            if (speechSynthesis.getVoices().length === 0) {
+                speechSynthesis.onvoiceschanged = () => narrate(text, onEnd);
+                return;
+            }
+
+            const speech = new SpeechSynthesisUtterance();
             speech.text = text;
 
-            if (langName === "Kannada") speech.lang = "kn-IN";
-            else if (langName === "Hindi") speech.lang = "hi-IN";
-            else speech.lang = "en-US";
+            const lang = language.trim().toLowerCase();
+            const voices = speechSynthesis.getVoices();
+            
+            // Helper to find best voice
+            function setVoice(search) {
+                const voice = voices.find(v => v.lang.startsWith(search) || v.name.toLowerCase().includes(search));
+                if (voice) speech.voice = voice;
+            }
 
-            speech.rate = 0.9;
-            speech.pitch = 1;
+            if (lang === "kannada") {
+                speech.lang = "kn-IN";
+                setVoice("kn");
+            } else if (lang === "hindi") {
+                speech.lang = "hi-IN";
+                setVoice("hi");
+            } else if (lang === "spanish") {
+                speech.lang = "es-ES";
+                setVoice("es");
+            } else {
+                speech.lang = "en-US";
+                setVoice("en");
+            }
 
+            speech.rate = 0.95;
+            speech.onend = onEnd;
             speechSynthesis.speak(speech);
+        }
+
+        // ===== CONTROLS =====
+        function nextScene() {
+            if (currentScene < totalScenes - 1) {
+                showScene(currentScene + 1);
+            }
+        }
+
+        function prevScene() {
+            if (currentScene > 0) {
+                showScene(currentScene - 1);
+            }
+        }
+
+        function togglePlayPause() {
+            isVoicePlaying = !isVoicePlaying;
+            document.getElementById('playPauseBtn').textContent = isVoicePlaying ? '🔊' : '🔇';
+            if (!isVoicePlaying) {
+                speechSynthesis.cancel();
+                clearTimeout(autoAdvanceTimer);
+            } else {
+                showScene(currentScene); // Restart current scene to get voice back
+            }
         }
     </script>
 
