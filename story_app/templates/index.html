@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magical Cartoon Story Generator</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+
+<body>
+
+    <h1>Magical Story Generator</h1>
+
+    <div class="container">
+        {% if error %}
+        <div class="error-msg">{{ error }}</div>
+        {% endif %}
+
+        <form id="storyForm" method="POST" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            <div class="form-group">
+                <label for="image">Upload Your Photo</label>
+                <input type="file" id="image" name="image" accept="image/*" required>
+            </div>
+
+            <div class="form-group">
+                <label for="hero">Hero Name</label>
+                <input type="text" id="hero" name="hero" placeholder="e.g. Brave Alex" required>
+            </div>
+
+            <div class="form-group">
+                <label for="language">Story Language</label>
+                <select id="language" name="language" required
+                    style="width: 100%; padding: 0.8rem; border: 2px solid #a8edea; border-radius: 10px; font-family: 'Inter', sans-serif; font-size: 1rem;">
+                    <option value="English">English</option>
+                    <option value="Kannada">Kannada</option>
+                    <option value="Hindi">Hindi</option>
+                    <option value="Spanish">Spanish</option>
+                </select>
+            </div>
+
+            <button type="submit" id="submitBtn">Generate My Magic Story!</button>
+            <div id="loader" class="spinner"></div>
+            <p id="waitMsg"
+                style="display: none; text-align: center; font-size: 0.9rem; color: #666; margin-top: 10px;">
+                Magical things take time... Please stay on this page while we talk to the AI. <br>
+                (It might take up to 2 minutes if the stars are busy! ✨)
+            </p>
+
+            <div style="margin-top: 2rem; padding: 1rem; background: #f8f9fa; border-radius: 10px; font-size: 0.85rem; color: #555; border: 1px dashed #ccc;">
+                <strong>💡 Tip: Getting around Quota limits</strong><br>
+                If you see quota errors, it's because many people are using this shared key. 
+                You can use your own 100% free key by following these steps:
+                <ol style="margin-top: 5px; padding-left: 20px;">
+                    <li>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>.</li>
+                    <li>Click <strong>"Get API Key"</strong>.</li>
+                    <li>Open the <code>.env</code> file in this project and replace the existing key with your new one.</li>
+                </ol>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('storyForm').addEventListener('submit', function () {
+            document.getElementById('submitBtn').style.display = 'none';
+            document.getElementById('loader').style.display = 'block';
+            document.getElementById('waitMsg').style.display = 'block';
+        });
+    </script>
+</body>
+
+</html>

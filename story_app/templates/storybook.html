@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Magical Story - {{ hero }}</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+
+<body>
+
+    <h1>The Adventures of {{ hero }}</h1>
+
+    <!-- View Toggle -->
+    <div class="view-toggle">
+        <button id="bookBtn" class="toggle-btn active" onclick="setView('book')">📖 Play Storybook</button>
+        <button id="fullBtn" class="toggle-btn" onclick="setView('full')">📜 See Full Story</button>
+    </div>
+
+    <div class="container book-container" id="storyContainer">
+
+        <!-- Comic Book Mode -->
+        <div id="bookMode">
+            <!-- Cover Page -->
+            <div class="comic-page active" id="page-0">
+                <div style="text-align: center;">
+                    <img src="{{ original_image_url }}" alt="Original Hero" class="moving-hero" style="max-width:100%; border-radius:15px; border: 10px solid white; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+                    <div class="scene-number">✨ The Beginning ✨</div>
+                </div>
+                <div class="story-text" style="text-align: center; font-size: 1.5rem; color: var(--primary-color);">
+                    <p>Once upon a time, there was a hero named <strong>{{ hero }}</strong>...</p>
+                    <p style="font-size: 1rem; color: #666; font-style: italic;">{{ hero_description }}</p>
+                </div>
+            </div>
+
+            {% for page in pages %}
+            <div class="comic-page" id="page-{{ forloop.index }}">
+                <div style="text-align: center;">
+                    <img src="{{ page.image_url }}" alt="Scene {{ forloop.index }}" class="moving-hero" style="max-width:100%; border-radius:10px;">
+                    <div class="scene-number">Scene {{ forloop.index }} <button
+                            onclick="playAudio('{{ page.narrative_text|escapejs }}', '{{ language }}')"
+                            class="audio-btn">🔊 Play</button></div>
+                </div>
+                <div class="story-text">
+                    {{ page.narrative_text|linebreaks }}
+                </div>
+            </div>
+            {% endfor %}
+
+            <!-- Pager Navigation -->
+            <div class="pager-nav">
+                <button id="prevBtn" class="nav-btn" onclick="changePage(-1)" disabled>← Back</button>
+                <span id="pageIndicator" style="font-weight: 700;">Page 1 of {{ pages|length|add:1 }}</span>
+                <button id="nextBtn" class="nav-btn" onclick="changePage(1)">Next Page →</button>
+            </div>
+        </div>
+
+        <!-- Full Story Mode (Hidden by default) -->
+        <div id="fullMode" class="full-story-view">
+            <div class="scene-block" style="text-align: center;">
+                 <img src="{{ original_image_url }}" alt="Original Hero" style="max-width:300px; border-radius:15px; border: 5px solid white;">
+                 <h3>The Hero: {{ hero }}</h3>
+            </div>
+            {% for page in pages %}
+            <div class="scene-block">
+                <div class="scene-number">Scene {{ forloop.index }} <button
+                        onclick="playAudio('{{ page.narrative_text|escapejs }}', '{{ language }}')"
+                        class="audio-btn">🔊</button></div>
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <img src="{{ page.image_url }}" alt="Scene {{ forloop.index }}" style="max-width:100%; border-radius:10px;">
+                </div>
+                <div class="story-text">
+                    {{ page.narrative_text|linebreaks }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div style="text-align: center; margin-top: 3rem;">
+            <a href="/" class="back-btn">← Create Another Magical Story</a>
+        </div>
+    </div>
+
+    <script>
+        let currentPage = 0;
+        const totalPages = {{ pages|length|add:1 }};
+
+        function setView(mode) {
+            const bookMode = document.getElementById('bookMode');
+            const fullMode = document.getElementById('fullMode');
+            const bookBtn = document.getElementById('bookBtn');
+            const fullBtn = document.getElementById('fullBtn');
+
+            if (mode === 'book') {
+                bookMode.style.display = 'block';
+                fullMode.classList.remove('active');
+                bookBtn.classList.add('active');
+                fullBtn.classList.remove('active');
+            } else {
+                bookMode.style.display = 'none';
+                fullMode.classList.add('active');
+                bookBtn.classList.remove('active');
+                fullBtn.classList.add('active');
+            }
+        }
+
+        function changePage(delta) {
+
+            const newPage = currentPage + delta;
+
+            if (newPage >= 0 && newPage < totalPages) {
+
+                document.getElementById("page-" + currentPage).classList.remove("active");
+
+                currentPage = newPage;
+
+                const pageEl = document.getElementById("page-" + currentPage);
+                pageEl.classList.add("active");
+
+                // Trigger fresh animation if image exists
+                const img = pageEl.querySelector('img');
+                if (img) {
+                    img.style.animation = 'none';
+                    img.offsetHeight; // trigger reflow
+                    img.style.animation = null;
+                }
+
+                // Stop playing audio when turning page
+                window.speechSynthesis.cancel();
+                updatePager();
+            }
+        }
+
+        function updatePager() {
+            document.getElementById('prevBtn').disabled = (currentPage === 0);
+            document.getElementById('nextBtn').disabled = (currentPage === totalPages - 1);
+            document.getElementById("pageIndicator").innerText = "Page " + (currentPage + 1) + " of " + totalPages;
+        }
+
+        function playAudio(text, langName) {
+
+            speechSynthesis.cancel();
+
+            const speech = new SpeechSynthesisUtterance();
+
+            speech.text = text;
+
+            if (langName === "Kannada") speech.lang = "kn-IN";
+            else if (langName === "Hindi") speech.lang = "hi-IN";
+            else speech.lang = "en-US";
+
+            speech.rate = 0.9;
+            speech.pitch = 1;
+
+            speechSynthesis.speak(speech);
+        }
+    </script>
+
+</body>
+
+</html>
