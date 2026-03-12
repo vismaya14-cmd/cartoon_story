@@ -26,12 +26,16 @@
             <!-- Cover Page -->
             <div class="comic-page active" id="page-0">
                 <div style="text-align: center;">
-                    <img src="{{ original_image_url }}" alt="Original Hero" class="moving-hero" style="max-width:100%; border-radius:15px; border: 10px solid white; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+                    <img src="{{ cover_image_url }}" alt="Cartoon Hero" class="moving-hero" style="max-width:100%; border-radius:15px; border: 10px solid white; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
                     <div class="scene-number">✨ The Beginning ✨</div>
                 </div>
                 <div class="story-text" style="text-align: center; font-size: 1.5rem; color: var(--primary-color);">
                     <p>Once upon a time, there was a hero named <strong>{{ hero }}</strong>...</p>
                     <p style="font-size: 1rem; color: #666; font-style: italic;">{{ hero_description }}</p>
+                    <div style="margin-top: 10px;">
+                        <img src="{{ original_image_url }}" alt="Original Photo" style="width: 80px; height: 80px; border-radius: 50%; border: 3px solid #a8edea; object-fit: cover;">
+                        <p style="font-size: 0.75rem; color: #999;">Original Photo</p>
+                    </div>
                 </div>
             </div>
 
