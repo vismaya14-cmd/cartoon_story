@@ -153,7 +153,7 @@ def home(request):
 
         Task 1: Signature Pixar Character. 
         Describe {hero_name} as a 3D animated character with a STRIKING and CONSISTENT visual signature.
-        Details to include: Unique hairstyle/color, eye color, a specific signature outfit (e.g., "wearing a glowing blue tunic and silver boots"), and expressive facial style.
+        Details to include: Unique hairstyle/color, LARGE GLISTENING EXPRESSIVE EYES, sculpted features, subsurface scattering for smooth skin, a specific signature outfit, and VIBRANT ANIMATED COLORS.
         This "Character Signature" MUST be the centerpiece of every scene prompt.
 
         Task 2: Cinematic 5-Scene Script. 
@@ -167,7 +167,7 @@ def home(request):
 
         Task 3: Pixar-Style Image Prompts. 
         Write a unique, highly-detailed image prompt for EACH scene.
-        FORMAT: "Pixar style 3D animation, [CHARACTER SIGNATURE], [SPECIFIC SCENE ACTION], [VIBRANT CINEMATIC BACKGROUND], colorful lighting, masterpiece, 8k render, children's animated movie style"
+        FORMAT: "Pixar style 3D animation, [CHARACTER SIGNATURE], [SPECIFIC SCENE ACTION], [VIBRANT CINEMATIC BACKGROUND], cinematic lighting, expressive eyes, vibrant colors, masterpiece, 8k render, children's animated movie style"
         CRITICAL: Each background MUST be different and highly detailed.
 
         Return ONLY valid JSON:
@@ -205,26 +205,29 @@ def home(request):
             panels = story_data.get("panels", [])
 
             # Generate Hero Image (Hugging Face -> Pollinations Fallback)
-            # Use user's EXACT required keywords for maximum Pixar quality
-            hero_prompt = f"Pixar style 3D animation, {char_sig}, standing in a vibrant, detailed village, colorful cinematic lighting, expressive cartoon character, detailed animated movie style, masterpiece, 8k render."
+            hero_prompt = f"Pixar style 3D animation, {char_sig}, expressive eyes, vibrant animated colors, standing in a vibrant, detailed village, cinematic lighting, detailed animated movie style, masterpiece, 8k render."
             
             cartoon_name = f"cartoon_{timestamp}.jpg"
             cartoon_path = os.path.join(cartoon_folder, cartoon_name)
             print(f"DEBUG: Generating Pixar-style 3D hero for {hero_name}...")
             
-            # Try HF first, then Pollinations
+            # Tiered Generation Strategy (Zero Real Photo Reuse)
             hf_success = huggingface_generate(hero_prompt, cartoon_path)
             if not hf_success:
-                print("DEBUG: HF Hero failed. Trying Pollinations fallback...")
+                print("DEBUG: HF Hero failed. Trying Pollinations (Detailed)...")
                 hf_success = pollinations_generate(hero_prompt, cartoon_path, seed=timestamp)
             
-            # FINAL FALLBACK: If AI completely fails, use OpenCV cartoonize
             if not hf_success:
-                print("DEBUG: AI Hero failed. Falling back to OpenCV CARTOONIZE...")
-                cartoon_success = cartoonize(image_path, cartoon_path)
-                cartoon_image_url = (settings.MEDIA_URL + "cartoon/" + cartoon_name) if cartoon_success else original_image_url
-            else:
+                print("DEBUG: Detailed AI failed. Trying Pollinations (Universal Pixar Style)...")
+                universal_hero_prompt = "Pixar style 3D animation, expressive cute character, cinematic lighting, masterpiece, high-quality 3D render, vibrant colors, detailed clothing"
+                hf_success = pollinations_generate(universal_hero_prompt, cartoon_path, seed=999)
+
+            # Assign Cartoon URL (Fail gracefully to a beautiful placeholder image if needed, but NOT the original)
+            if hf_success:
                 cartoon_image_url = settings.MEDIA_URL + "cartoon/" + cartoon_name
+            else:
+                # Absolute last resort: A beautiful pre-generated AI character link or a high-quality solid style
+                cartoon_image_url = "https://image.pollinations.ai/prompt/Pixar%20style%20magical%20hero%20standing%20proudly?nologo=true"
 
             # Generate all Scene Images (Parallel for speed)
             pages = []
@@ -233,33 +236,24 @@ def home(request):
                 scene_name = f"scene_{timestamp}_{idx}.jpg"
                 scene_path = os.path.join(cartoon_folder, scene_name)
                 
-                # 1. Try Primary High-Quality Generation (HF SDXL)
+                # 1. Primary AI (HF)
                 success = huggingface_generate(panel_prompt, scene_path)
                 
-                # 2. Try Pollinations with the full prompt
+                # 2. Pollinations (Full Prompt)
                 if not success:
-                    print(f"DEBUG: Scene {idx} HF failed. Trying Pollinations Full Prompt...")
+                    print(f"DEBUG: Scene {idx} HF failed. Trying Pollinations Full...")
                     success = pollinations_generate(panel_prompt, scene_path, seed=timestamp + idx)
                 
-                # 3. New Hybrid Fallback: If full prompt fails, try a SIMPLE BACKGROUND ONLY prompt
-                # This ensures the user at least gets a beautiful Pixar background.
+                # 3. Pollinations (Simplified Cinematic Background/Action)
                 if not success:
-                    # Extract last 40 chars of prompt (usually where background is described)
-                    bg_keyword = panel_prompt.split(",")[-2].strip() if "," in panel_prompt else "magical 3d world"
-                    bg_prompt = f"Pixar style 3D animation background, {bg_keyword}, colorful cinematic lighting, masterpiece, high-quality 3D render"
-                    print(f"DEBUG: Scene {idx} full prompt failed. Trying simplified Background-Only: {bg_keyword}")
-                    success = pollinations_generate(bg_prompt, scene_path, seed=timestamp + idx)
+                    simple_prompt = f"Pixar style cinematic animation, {panel_prompt.split(',')[-2] if ',' in panel_prompt else 'magical adventure'}, masterpiece, 3D render"
+                    print(f"DEBUG: Scene {idx} retrying with Simple Prompt...")
+                    success = pollinations_generate(simple_prompt, scene_path, seed=timestamp + idx)
 
-                # 4. FINAL LOCAL FALLBACK: If AI completely fails, use Sharp 3D Synth 3.0
                 if success:
                     return settings.MEDIA_URL + "cartoon/" + scene_name
                 else:
-                    print(f"DEBUG: Scene {idx} AI completely failed. Using Sharp 3D Synth Variation {idx}")
-                    # Variation shifts camera framing and color mood
-                    cartoon_success = cartoonize(image_path, scene_path, variation=idx)
-                    if cartoon_success:
-                        return settings.MEDIA_URL + "cartoon/" + scene_name
-                    return cartoon_image_url
+                    return "https://image.pollinations.ai/prompt/Pixar%20style%20magical%20cinematic%20scenery?nologo=true"
 
             print(f"DEBUG: Generating {len(panels)} Pixar scenes in parallel...")
             with ThreadPoolExecutor(max_workers=4) as executor:
