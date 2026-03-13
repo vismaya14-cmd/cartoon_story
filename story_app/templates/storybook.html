@@ -58,7 +58,8 @@
         .hero-banner img {
             width: 100%;
             height: 100%;
-            object-fit: cover;
+            object-fit: contain;
+            background: #000;
         }
 
         /* ===== MAGICAL FX LAYERS ===== */
@@ -95,6 +96,54 @@
             to { left: 120%; }
         }
 
+        /* ===== CINEMATIC PLAYER: Core Layout ===== */
+        #storyPlayer {
+            position: fixed;
+            inset: 0;
+            z-index: 50;
+            background: #000;
+            display: none; /* Shown via JS */
+            flex-direction: column;
+        }
+
+        #storyPlayer.active {
+            display: flex;
+        }
+
+        .scene-bg {
+            position: absolute;
+            inset: 0;
+            background-size: cover;
+            background-position: center;
+            filter: blur(80px) brightness(0.4);
+            transform: scale(1.2);
+            z-index: 0;
+            transition: background-image 1.2s ease;
+        }
+
+        .player-content {
+            flex: 1;
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .scene-counter {
+            position: absolute;
+            top: 2rem;
+            left: 2rem;
+            font-size: 0.9rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            opacity: 0.6;
+            font-weight: 700;
+            z-index: 10;
+        }
+
         /* Ken Burns Effect */
         @keyframes kenBurns {
             0% { transform: scale(1) translate(0, 0); }
@@ -105,16 +154,21 @@
         .scene-image-wrapper {
             position: relative;
             width: 100%;
-            height: 100%;
+            height: 60vh; /* Fixed height to prevent flex collapse */
+            max-height: 600px;
             overflow: hidden;
             background: #000;
+            border-radius: 20px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.1);
         }
 
         .scene-image {
             width: 100%;
             height: 100%;
-            object-fit: cover;
+            object-fit: contain;
             animation: kenBurns 20s infinite ease-in-out;
+            background: #000;
         }
 
         .scene-image.fade-out {
@@ -325,7 +379,7 @@
         const scenes = [
             {% for page in pages %}
             {
-                text: `{{ page.narrative_text|escapejs }}`,
+                text: "{{ page.narrative_text|escapejs }}",
                 sceneImage: "{{ page.scene_image_url }}",
                 number: {{ forloop.counter }}
             }{% if not forloop.last %},{% endif %}
@@ -358,7 +412,6 @@
         }
 
         // ===== SHOW SCENE =====
-        // ===== SHOW SCENE =====
         function showScene(index) {
             if (index < 0 || index >= totalScenes) return;
             currentScene = index;
@@ -382,25 +435,42 @@
             img.classList.add('fade-out');
             textArea.classList.add('slide-up');
 
+            // Safety flag to prevent double execution
+            let hasStarted = false;
+            const startSceneContent = () => {
+                if (hasStarted) return;
+                hasStarted = true;
+                console.log("DEBUG: Scene started successfully:", scene.sceneImage);
+                img.classList.remove('fade-out');
+                textArea.classList.remove('slide-up');
+                
+                // Start typewriter + narration
+                typewriterEffect(scene.text, () => {
+                    if (isVoicePlaying) {
+                        narrate(scene.text, () => {
+                            if (currentScene < totalScenes - 1) {
+                                autoAdvanceTimer = setTimeout(nextScene, 4000);
+                            }
+                        });
+                    }
+                });
+            };
+
             setTimeout(() => {
+                console.log("DEBUG: Loading scene image:", scene.sceneImage);
+                // Attach listeners BEFORE setting .src
+                img.onload = startSceneContent;
+                img.onerror = () => {
+                    console.error("DEBUG: Failed to load scene image:", scene.sceneImage);
+                    startSceneContent();
+                };
+                
+                // Set source
                 img.src = scene.sceneImage;
                 bg.style.backgroundImage = `url('${scene.sceneImage}')`;
                 
-                img.onload = () => {
-                    img.classList.remove('fade-out');
-                    textArea.classList.remove('slide-up');
-                    
-                    // Start typewriter + narration
-                    typewriterEffect(scene.text, () => {
-                        if (isVoicePlaying) {
-                            narrate(scene.text, () => {
-                                if (currentScene < totalScenes - 1) {
-                                    autoAdvanceTimer = setTimeout(nextScene, 3000);
-                                }
-                            });
-                        }
-                    });
-                };
+                // Absolute safety: start after 3s if events fail
+                setTimeout(startSceneContent, 3000);
             }, 500);
 
             // Update button states

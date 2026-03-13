@@ -37,8 +37,10 @@ client = ChatCompletionsClient(
 
 # Configure Hugging Face API
 HF_API_KEY = os.getenv("HF_API_KEY")
-HF_MODEL = "stabilityai/stable-diffusion-xl-base-1.0"
-HF_API_URL = f"https://router.huggingface.co/hf-inference/models/{HF_MODEL}"
+HF_MODELS = [
+    "stabilityai/stable-diffusion-xl-base-1.0",
+    "prompthero/openjourney" 
+]
 
 def pollinations_generate(prompt, output_path, seed=None):
     """
@@ -49,65 +51,66 @@ def pollinations_generate(prompt, output_path, seed=None):
             seed = int(time.time())
             
         # Pollinations is VERY sensitive to length and special chars.
-        # We simplify to the core 120 chars to ensure it doesn't time out.
-        simple_prompt = prompt[:120]
+        # We simplify to ensure it doesn't time out or return HTML error pages.
+        # Clean special characters that break URLs
+        clean_prompt = prompt.replace("\n", " ").replace('"', '').replace("'", "")
+        simple_prompt = clean_prompt[:180] 
         encoded_prompt = urllib.parse.quote(simple_prompt)
         
-        # Simplest possible URL works best
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?seed={seed}&nologo=true"
-        print(f"DEBUG: Calling Pollinations (Simple) for: {simple_prompt[:40]}...")
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?seed={seed}&nologo=true&width=1024&height=1024"
+        print(f"DEBUG: Calling Pollinations for: {simple_prompt[:50]}...")
         
-        response = requests.get(url, timeout=35)
+        response = requests.get(url, timeout=40)
         
-        # Check if it's an image
         content_type = response.headers.get("Content-Type", "").lower()
-        if response.status_code == 200 and "image" in content_type:
+        # CRITICAL: Must be an image and MUST be a reasonable size (HTML errors are usually < 5KB)
+        if response.status_code == 200 and "image" in content_type and len(response.content) > 10000:
             with open(output_path, "wb") as f:
                 f.write(response.content)
+            print(f"DEBUG: Pollinations Success! Size: {len(response.content)} bytes")
             return True
         else:
-            print(f"DEBUG: Pollinations Failure ({response.status_code}) - Type: {content_type}")
+            print(f"DEBUG: Pollinations Invalid Response - Status: {response.status_code}, Type: {content_type}, Size: {len(response.content)}")
     except Exception as e:
         print(f"DEBUG: Pollinations Exception: {str(e)}")
     return False
 
 
-def huggingface_generate(prompt, output_path, retries=1):
+def huggingface_generate(prompt, output_path, model_id):
     """
-    Generate an image using Hugging Face SDXL.
+    Generate an image using a specific Hugging Face model with strict validation.
     """
     if not HF_API_KEY:
         return False
     
+    api_url = f"https://router.huggingface.co/hf-inference/models/{model_id}"
     headers = {"Authorization": f"Bearer {HF_API_KEY}"}
     payload = {
         "inputs": prompt,
         "parameters": {
-            "negative_prompt": "photorealistic, photo, real life, gritty, messy, blurry, lowres, text, watermark",
-            "guidance_scale": 9.0,
-            "num_inference_steps": 30
+            "negative_prompt": "photorealistic, photo, real life, gritty, messy, blurry, lowres, text, watermark, deformed, ugly",
+            "guidance_scale": 7.5,
+            "num_inference_steps": 25
         }
     }
 
-    for attempt in range(retries + 1):
-        try:
-            print(f"DEBUG: Calling Hugging Face for prompt: {prompt[:50]}... (Attempt {attempt + 1})")
-            response = requests.post(HF_API_URL, headers=headers, json=payload, timeout=90)
-            
-            if response.status_code == 200:
-                with open(output_path, "wb") as f:
-                    f.write(response.content)
-                return True
-            else:
-                print(f"DEBUG: HF Error {response.status_code}: {response.text[:100]}")
-                # Don't retry on auth errors or 404
-                if response.status_code in [401, 403, 404]:
-                    break
-                time.sleep(2)
-        except Exception as e:
-            print(f"DEBUG: HF Exception: {str(e)}")
-            time.sleep(1)
-    return False
+    try:
+        print(f"DEBUG: Calling Hugging Face [{model_id}]...")
+        response = requests.post(api_url, headers=headers, json=payload, timeout=65)
+        
+        content_type = response.headers.get("Content-Type", "").lower()
+        if response.status_code == 200 and "image" in content_type and len(response.content) > 10000:
+            with open(output_path, "wb") as f:
+                f.write(response.content)
+            print(f"DEBUG: HF Success with {model_id}! Size: {len(response.content)} bytes")
+            return True
+        else:
+            msg = response.text[:50] if "json" in content_type else "Non-image response"
+            print(f"DEBUG: HF {model_id} failed. Status: {response.status_code}, Msg: {msg}")
+            return False
+    except Exception as e:
+        print(f"DEBUG: HF Exception with {model_id}: {str(e)}")
+        return False
 
 
 def home(request):
@@ -151,10 +154,10 @@ def home(request):
         You are a Master Director at Pixar Animation Studios. 
         Analyze the uploaded photo of {hero_name} and create a professional children's animated movie.
 
-        Task 1: Signature Pixar Character. 
-        Describe {hero_name} as a 3D animated character with a STRIKING and CONSISTENT visual signature.
-        Details to include: Unique hairstyle/color, LARGE GLISTENING EXPRESSIVE EYES, sculpted features, subsurface scattering for smooth skin, a specific signature outfit, and VIBRANT ANIMATED COLORS.
-        This "Character Signature" MUST be the centerpiece of every scene prompt.
+        Task 1: **Absolute Visual Identity Signature**. 
+        Analyze the person in the photo and capture their specific character traits (Exact hair style/color, eye color/shape, facial structure like jawline and cheekbones, and their specific outfit colors).
+        TRANSFORMATION: Describe them as a masterpiece 3D Pixar character with LARGE GLISSENING EXPRESSIVE EYES, smooth subsurface scattering skin, and a friendly smile.
+        The description MUST be a detailed 60-word visual "Identity Lock" string that will be used to keep them looking the same in every scene.
 
         Task 2: Cinematic 5-Scene Script. 
         Write a heartwarming 5-scene story in {language} about {hero_name}. 
@@ -165,10 +168,14 @@ def home(request):
         4. Climax: Solving a challenge with a clever idea.
         5. Celebration: A grand happy ending in a festival setting.
 
-        Task 3: Pixar-Style Image Prompts. 
-        Write a unique, highly-detailed image prompt for EACH scene.
-        FORMAT: "Pixar style 3D animation, [CHARACTER SIGNATURE], [SPECIFIC SCENE ACTION], [VIBRANT CINEMATIC BACKGROUND], cinematic lighting, expressive eyes, vibrant colors, masterpiece, 8k render, children's animated movie style"
-        CRITICAL: Each background MUST be different and highly detailed.
+        Task 3: **Cinematic Scene Prompts**. 
+        Write a unique, highly-detailed image prompt for EACH of the 5 scenes.
+        MANDATORY ELEMENTS:
+        - Must start with "Disney Pixar 3D animation style,"
+        - Must include the full [IMAGE SIGNATURE] from Task 1.
+        - Must include a specific environment (e.g., "colorful glowing village," "dark emerald forest," "ancient library").
+        - Must include the character's action and a unique camera angle.
+        - Finish with keywords: "octane render, Unreal Engine 5, ray-traced lighting, masterpiece, 8k, vibrant colors, stylized 3D".
 
         Return ONLY valid JSON:
         {{
@@ -197,6 +204,7 @@ def home(request):
             )
 
             result_text = response.choices[0].message.content.strip()
+            print(f"DEBUG: GPT-4o Result: {result_text}")
             if result_text.startswith("```"): result_text = result_text.strip("`").strip("json")
             
             story_data = json.loads(result_text)
@@ -204,67 +212,81 @@ def home(request):
             story_title = story_data.get("story_title", f"{hero_name}'s Adventure")
             panels = story_data.get("panels", [])
 
+            for i, p in enumerate(panels):
+                print(f"DEBUG: Panel {i} Prompt: {p.get('prompt', 'MISSING')}")
+
             # Generate Hero Image (Hugging Face -> Pollinations Fallback)
-            hero_prompt = f"Pixar style 3D animation, {char_sig}, expressive eyes, vibrant animated colors, standing in a vibrant, detailed village, cinematic lighting, detailed animated movie style, masterpiece, 8k render."
+            hero_prompt = f"Disney Pixar 3D animation style, {char_sig}, standing heroically in a vibrant village square, cinematic lighting, stylized 3D, high-quality render, 8k."
             
             cartoon_name = f"cartoon_{timestamp}.jpg"
             cartoon_path = os.path.join(cartoon_folder, cartoon_name)
-            print(f"DEBUG: Generating Pixar-style 3D hero for {hero_name}...")
+            print(f"DEBUG: Sculpting Pixar-style 3D Hero for {hero_name}...")
             
-            # Tiered Generation Strategy (Zero Real Photo Reuse)
-            hf_success = huggingface_generate(hero_prompt, cartoon_path)
-            if not hf_success:
-                print("DEBUG: HF Hero failed. Trying Pollinations (Detailed)...")
-                hf_success = pollinations_generate(hero_prompt, cartoon_path, seed=timestamp)
+            # --- Hero Tiered Strategy ---
+            hf_success = False
+            for model_id in HF_MODELS:
+                if huggingface_generate(hero_prompt, cartoon_path, model_id):
+                    hf_success = True; break
             
             if not hf_success:
-                print("DEBUG: Detailed AI failed. Trying Pollinations (Universal Pixar Style)...")
-                universal_hero_prompt = "Pixar style 3D animation, expressive cute character, cinematic lighting, masterpiece, high-quality 3D render, vibrant colors, detailed clothing"
-                hf_success = pollinations_generate(universal_hero_prompt, cartoon_path, seed=999)
+                print("DEBUG: HF Hero failed. Trying Pollinations (Turbo Mode)...")
+                # Turbo mode is significantly faster and more available
+                hf_success = pollinations_generate(hero_prompt + " --turbo", cartoon_path, seed=timestamp)
 
-            # Assign Cartoon URL (Fail gracefully to a beautiful placeholder image if needed, but NOT the original)
             if hf_success:
-                cartoon_image_url = settings.MEDIA_URL + "cartoon/" + cartoon_name
+                cartoon_image_url = settings.MEDIA_URL + f"cartoon/{cartoon_name}"
             else:
-                # Absolute last resort: A beautiful pre-generated AI character link or a high-quality solid style
-                cartoon_image_url = "https://image.pollinations.ai/prompt/Pixar%20style%20magical%20hero%20standing%20proudly?nologo=true"
+                print("DEBUG: All Hero AI failed. Using Local 3D Stylization Fallback...")
+                if cartoonize(image_path, cartoon_path, variation=0):
+                    cartoon_image_url = settings.MEDIA_URL + f"cartoon/{cartoon_name}"
+                else:
+                    cartoon_image_url = settings.STATIC_URL + "images/placeholder.png"
 
-            # Generate all Scene Images (Parallel for speed)
+            # Generate all Scene Images (Parallel)
             pages = []
             
-            def generate_scene_image(idx, panel_prompt):
-                scene_name = f"scene_{timestamp}_{idx}.jpg"
-                scene_path = os.path.join(cartoon_folder, scene_name)
+            def generate_scene_image(idx, p):
+                p_prompt = p.get("prompt", "")
+                p_text = p.get("text", "magical adventure")
+                s_name = f"scene_{timestamp}_{idx}.jpg"
+                s_path = os.path.join(cartoon_folder, s_name)
                 
-                # 1. Primary AI (HF)
-                success = huggingface_generate(panel_prompt, scene_path)
+                # 1. HF Tiers
+                success = False
+                for m_id in HF_MODELS:
+                    if huggingface_generate(p_prompt, s_path, m_id):
+                        success = True; break
                 
-                # 2. Pollinations (Full Prompt)
+                # 2. Pollinations Precise
                 if not success:
-                    print(f"DEBUG: Scene {idx} HF failed. Trying Pollinations Full...")
-                    success = pollinations_generate(panel_prompt, scene_path, seed=timestamp + idx)
+                    print(f"DEBUG: Scene {idx} HF failed. Trying Pollinations Precisely...")
+                    success = pollinations_generate(p_prompt, s_path, seed=timestamp + idx + 10)
                 
-                # 3. Pollinations (Simplified Cinematic Background/Action)
+                # 3. Pollinations Simplified Identity Lock
                 if not success:
-                    simple_prompt = f"Pixar style cinematic animation, {panel_prompt.split(',')[-2] if ',' in panel_prompt else 'magical adventure'}, masterpiece, 3D render"
-                    print(f"DEBUG: Scene {idx} retrying with Simple Prompt...")
-                    success = pollinations_generate(simple_prompt, scene_path, seed=timestamp + idx)
+                    print(f"DEBUG: Scene {idx} simplifying for identity lock...")
+                    # Extract roughly what's happening
+                    action_summary = p_text[:60].split(".")[0]
+                    simple_p = f"Disney Pixar 3D animation, {char_sig}, {action_summary}, cinematic background, masterpiece, 8k"
+                    success = pollinations_generate(simple_p, s_path, seed=timestamp + idx + 20)
 
                 if success:
-                    return settings.MEDIA_URL + "cartoon/" + scene_name
+                    return settings.MEDIA_URL + f"cartoon/{s_name}"
                 else:
-                    return "https://image.pollinations.ai/prompt/Pixar%20style%20magical%20cinematic%20scenery?nologo=true"
+                    print(f"DEBUG: Scene {idx} AI failed. Using Local Stylized Hero + Narrative Overlay...")
+                    # Even if pure AI fails, we use their face stylized locally
+                    if cartoonize(image_path, s_path, variation=idx+1):
+                        return settings.MEDIA_URL + f"cartoon/{s_name}"
+                    return settings.STATIC_URL + "images/placeholder.png"
 
-            print(f"DEBUG: Generating {len(panels)} Pixar scenes in parallel...")
-            with ThreadPoolExecutor(max_workers=4) as executor:
-                # Kick off all generations
-                futures = [executor.submit(generate_scene_image, i, p["prompt"]) for i, p in enumerate(panels)]
-                # Wait and collect results
+            print(f"DEBUG: Generating {len(panels)} unique Pixar scenes...")
+            with ThreadPoolExecutor(max_workers=5) as executor:
+                futures = [executor.submit(generate_scene_image, i, p) for i, p in enumerate(panels)]
                 scene_urls = [f.result() for f in futures]
 
-            for i, panel in enumerate(panels):
+            for i, p_data in enumerate(panels):
                 pages.append({
-                    "narrative_text": panel["text"],
+                    "narrative_text": p_data["text"],
                     "scene_image_url": scene_urls[i],
                     "panel_number": i + 1
                 })

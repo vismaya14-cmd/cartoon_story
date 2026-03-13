@@ -44,11 +44,37 @@
 
             <button type="submit" id="submitBtn">Generate Animated Movie! 🎞️</button>
             <div id="loader" class="spinner"></div>
-            <div id="waitMsg" style="display: none; text-align: center; margin-top: 2rem; font-size: 1.1rem; line-height: 1.6; color: #666; font-weight: 500;">
-                <span style="font-size: 1.5rem;">📽️</span><br>
-                <b>Directing your Pixar Masterpiece...</b><br>
-                We are generating 5 unique animated scenes with cinematic lighting.<br>
-                <small>(Estimated wait: 2-3 minutes. Magic takes time!)</small>
+            <div id="waitMsg" style="display: none; text-align: center; margin-top: 2rem; padding: 2rem; background: rgba(255,255,255,0.9); border-radius: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border: 2px dashed #ff9a9e;">
+                <div class="sketching-animation" style="font-size: 3rem; margin-bottom: 1rem; animation: pencilMove 2s infinite linear;">✏️</div>
+                <h3 style="color: #ff4e50; margin-bottom: 0.5rem;">Drafting Your Masterpiece...</h3>
+                <p style="color: #666; font-size: 1rem; line-height: 1.5;">
+                    The Animation Studio is currently drawing your characters and lighting the magical scenes.<br>
+                    <b>Please stay on this page.</b><br>
+                    <small>Estimated time: 45-90 seconds. Magic is being brewed! ✨</small>
+                </p>
+                <style>
+                    @keyframes pencilMove {
+                        0% { transform: translate(0, 0) rotate(0deg); }
+                        25% { transform: translate(10px, -10px) rotate(15deg); }
+                        50% { transform: translate(20px, 0) rotate(0deg); }
+                        75% { transform: translate(10px, 10px) rotate(-15deg); }
+                        100% { transform: translate(0, 0) rotate(0deg); }
+                    }
+                    .spinner {
+                        border: 6px solid #f3f3f3;
+                        border-top: 6px solid #ff4e50;
+                        border-radius: 50%;
+                        width: 60px;
+                        height: 60px;
+                        animation: spin 1s linear infinite;
+                        margin: 20px auto;
+                        display: none;
+                    }
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                </style>
             </div>
         </form>
     </div>
